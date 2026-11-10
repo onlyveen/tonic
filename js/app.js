@@ -245,7 +245,7 @@ function buildPiano() {
       const rect = svg('rect', { x, y: 0.5, width: W, height: H, rx: 4, class: 'w' }, root);
       const dot = svg('circle', { cx: x + W / 2, cy: H - 30, r: 3, class: 'kd' }, root);
       const label = svg('text', { x: x + W / 2, y: H - 10, class: 'pl' }, root);
-      pianoKeys.push({ pc, rect, dot, label, white: true });
+      pianoKeys.push({ pc, idx: o * 12 + pc, rect, dot, label, white: true });
     });
   }
   for (let o = 0; o < 2; o++) {
@@ -253,21 +253,24 @@ function buildPiano() {
       const x = 0.5 + (o * 7 + after) * W - 9;
       const rect = svg('rect', { x, y: 0.5, width: 18, height: 68, rx: 3, class: 'b' }, root);
       const dot = svg('circle', { cx: x + 9, cy: 56, r: 3, class: 'kd' }, root);
-      pianoKeys.push({ pc, rect, dot, white: false });
+      pianoKeys.push({ pc, idx: o * 12 + pc, rect, dot, white: false });
     });
   }
 }
 
-// Plain black-and-white keyboard; the scale's keys turn orange, the home note gets a dot.
+// Plain black-and-white keyboard. Only one run of the scale lights up: the 8 keys from the
+// home note up to the same note an octave higher. Both home notes get a dot.
 function drawPiano(desc) {
-  const names = new Map(desc.notes.map((n) => [n.pc, n.name]));
+  const steps = SCALES[desc.scaleId].steps;
+  const run = new Map(steps.map((st, i) => [desc.tonic + st, desc.notes[i].name]));
+  run.set(desc.tonic + 12, desc.notes[0].name);
   for (const k of pianoKeys) {
-    const inScale = desc.pcs.has(k.pc);
-    k.rect.setAttribute('class', (k.white ? 'w' : 'b') + (inScale ? ' in' : ''));
-    k.dot.setAttribute('class', k.pc === desc.tonic ? 'kd on' : 'kd');
+    const lit = run.has(k.idx);
+    k.rect.setAttribute('class', (k.white ? 'w' : 'b') + (lit ? ' in' : ''));
+    k.dot.setAttribute('class', k.idx === desc.tonic || k.idx === desc.tonic + 12 ? 'kd on' : 'kd');
     if (k.label) {
-      k.label.textContent = inScale ? names.get(k.pc) : '';
-      k.label.setAttribute('class', inScale ? 'pl in' : 'pl');
+      k.label.textContent = lit ? run.get(k.idx) : '';
+      k.label.setAttribute('class', lit ? 'pl in' : 'pl');
     }
   }
 }
