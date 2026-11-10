@@ -30,8 +30,8 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3M4.5 4.5v3.7h3.7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
           <p class="now" id="status-text" role="status" aria-live="polite">Ready</p>
-          <button type="button" class="icon-btn" id="about-btn" aria-label="How Tonic works" aria-controls="about">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-dasharray="3.4 0.9"/><circle cx="12" cy="12" r="2.6" fill="#D9301A"/></svg>
+          <button type="button" class="icon-btn brand-btn" id="about-btn" aria-label="About Tonic" aria-controls="about">
+            <img src="icons/brand/mark-ink.svg" alt="" width="30" height="30">
           </button>
         </div>
 
@@ -45,6 +45,10 @@
 
       <!-- The deck: vinyl circle of fifths, track row, cards -->
       <section class="deck" aria-label="Key details">
+        <div class="deck-head">
+          <img src="icons/brand/mark-paper.svg" alt="" width="22" height="22">
+          <img src="icons/brand/wordmark-white.svg" alt="Tonic" class="wordmark" width="45" height="11">
+        </div>
         <div class="picker">
           <p class="picker-label" id="picker-label">Closest scales</p>
           <div class="seg" id="scales" role="group" aria-labelledby="picker-label"></div>
@@ -90,12 +94,26 @@
 
         <details class="card about" id="about">
           <summary><h2>How Tonic works</h2><span class="chev" aria-hidden="true"></span></summary>
+          <img src="icons/brand/full-logo-dark.svg" alt="Tonic" class="about-logo" width="2070" height="658">
           <p class="card-sub">Tonic measures how much of each of the 12 notes it hears, with extra weight on the bass line, and compares that with templates for every major and minor key (Krumhansl–Kessler and Temperley profiles). After about 20 seconds it also tests the Dorian, Mixolydian, Lydian and Phrygian modes, and checks minor keys for a raised 7th. It corrects for songs that aren't tuned to A&nbsp;=&nbsp;440&nbsp;Hz.</p>
           <p class="card-sub">Audio is analyzed on this device and never uploaded.</p>
           <button type="button" class="pill-btn" id="install" hidden>Install app</button>
           <p class="card-sub" id="ios-hint" hidden>To install on iPhone: tap Share, then Add to Home Screen.</p>
+          <p class="version" id="version"></p>
         </details>
       </section>
+
+      <div class="toast" id="update-toast" role="status" aria-live="polite" hidden>
+        <img src="icons/brand/mark-ink.svg" alt="" width="28" height="28">
+        <div class="toast-text">
+          <p class="toast-title">Update available</p>
+          <p class="toast-sub">Refresh to get the newest version of Tonic.</p>
+        </div>
+        <button type="button" class="toast-btn" id="update-refresh">Refresh</button>
+        <button type="button" class="toast-x" id="update-later" aria-label="Dismiss, update later">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+        </button>
+      </div>
 
       <nav class="transport" aria-label="Controls">
         <button type="button" class="pad" id="listen" aria-label="Listen with the microphone">
@@ -115,7 +133,10 @@
         <input type="file" id="file" accept="audio/*,video/mp4,.mp3,.m4a,.aac,.wav,.flac,.ogg,.opus" hidden>
       </nav>
     </div>
-    <p class="credit">tonic · key &amp; scale finder</p>
+    <div class="credit">
+      <img src="icons/brand/full-logo-light.svg" alt="Tonic" width="2070" height="658">
+      <span>Key &amp; scale finder</span>
+    </div>
   </div>
 </body>
 </html>

@@ -34,6 +34,7 @@ const state = {
   pick: null, // id of the scale the user selected among the closest three
   last3: null, // last render inputs, so a pick can re-render without new audio
   deferredInstall: null,
+  updateRequested: false,
 };
 
 /* ---------- Audio context (shared by mic and preview synth) ---------- */
@@ -823,11 +824,47 @@ window.addEventListener('beforeinstallprompt', (e) => {
 });
 window.addEventListener('appinstalled', () => { $('install').hidden = true; });
 
+const APP_VERSION = '1.3.0';
+
+/* Updates: a new service worker installs in the background and waits; we offer Refresh. */
+function showUpdateToast(worker) {
+  const toast = $('update-toast');
+  if (!toast.hidden) return;
+  toast.hidden = false;
+  $('update-refresh').onclick = () => {
+    $('update-refresh').disabled = true;
+    $('update-refresh').textContent = 'Updating…';
+    state.updateRequested = true;
+    worker.postMessage({ type: 'SKIP_WAITING' });
+  };
+  $('update-later').onclick = () => { toast.hidden = true; };
+}
+
 function registerServiceWorker() {
   try {
-    if ('serviceWorker' in navigator && window.isSecureContext) {
-      navigator.serviceWorker.register('sw.js').catch(() => {});
-    }
+    if (!('serviceWorker' in navigator) || !window.isSecureContext) return;
+    let reloading = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (reloading || !state.updateRequested) return;
+      reloading = true;
+      window.location.reload();
+    });
+    navigator.serviceWorker.register('sw.js').then((reg) => {
+      const watch = (worker) => {
+        if (!worker) return;
+        worker.addEventListener('statechange', () => {
+          // "installed" with an existing controller means a newer version is waiting.
+          if (worker.state === 'installed' && navigator.serviceWorker.controller) showUpdateToast(worker);
+        });
+      };
+      if (reg.waiting && navigator.serviceWorker.controller) showUpdateToast(reg.waiting);
+      watch(reg.installing);
+      reg.addEventListener('updatefound', () => watch(reg.installing));
+      // Check for a new version when the app comes back to the foreground, and every 30 minutes.
+      const check = () => { if (state.mode === 'idle') reg.update().catch(() => {}); };
+      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') check(); });
+      setInterval(check, 30 * 60 * 1000);
+    }).catch(() => {});
   } catch { /* sandboxed previews refuse service workers */ }
 }
 
@@ -913,6 +950,7 @@ function init() {
   const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
   if (iOS && !standalone) $('ios-hint').hidden = false;
 
+  $('version').textContent = `Version ${APP_VERSION}`;
   registerServiceWorker();
 }
 

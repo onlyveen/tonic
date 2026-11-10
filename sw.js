@@ -1,5 +1,6 @@
-// Tonic service worker: app shell works offline; fonts are cached on first use.
-const VERSION = 'tonic-v2';
+// Tonic service worker.
+// Bump VERSION on every release: the page sees the new worker waiting and offers "Refresh".
+const VERSION = 'tonic-v3';
 const SHELL = [
   './',
   './index.html',
@@ -12,11 +13,24 @@ const SHELL = [
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/apple-touch-icon.png',
+  './icons/brand/mark-ink.svg',
+  './icons/brand/mark-paper.svg',
+  './icons/brand/wordmark-white.svg',
+  './icons/brand/full-logo-dark.svg',
+  './icons/brand/full-logo-light.svg',
 ];
 const FONT_CACHE = 'tonic-fonts';
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  // Fetch past the HTTP cache so a new version never installs stale files.
+  event.waitUntil(
+    caches.open(VERSION).then((c) => c.addAll(SHELL.map((u) => new Request(u, { cache: 'reload' }))))
+  );
+  // No skipWaiting here: the new version waits until the user taps Refresh.
+});
+
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
@@ -38,16 +52,15 @@ self.addEventListener('fetch', (event) => {
   }
   if (url.origin !== self.location.origin) return;
 
+  // Serve this version's files from its own cache so a page never mixes versions.
+  // The service worker file itself is never cached (the browser checks it directly).
   if (req.mode === 'navigate') {
-    // Network first for the page so updates arrive; fall back to the cached shell offline.
-    event.respondWith(
-      fetch(req)
-        .then((res) => { const copy = res.clone(); caches.open(VERSION).then((c) => c.put('./index.html', copy)); return res; })
-        .catch(() => caches.match('./index.html'))
-    );
+    event.respondWith(caches.open(VERSION).then((c) => c.match('./index.html')).then((hit) => hit || fetch(req)));
     return;
   }
-  event.respondWith(staleWhileRevalidate(req, VERSION));
+  event.respondWith(
+    caches.open(VERSION).then((c) => c.match(req, { ignoreSearch: true })).then((hit) => hit || fetch(req))
+  );
 });
 
 async function staleWhileRevalidate(req, cacheName) {

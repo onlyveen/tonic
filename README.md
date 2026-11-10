@@ -1,4 +1,11 @@
-# Tonic — key & scale finder (PWA)
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="icons/brand/full-logo-dark.svg">
+    <img src="icons/brand/full-logo-light.svg" alt="Tonic" width="360">
+  </picture>
+</p>
+
+# Tonic: key & scale finder (PWA)
 
 Listens to a song through the microphone (or reads an audio file) and tells you:
 
@@ -30,7 +37,7 @@ Upload the folder to any static host with HTTPS (Vercel, Netlify, Cloudflare Pag
 
 Then open it on your phone → Install (Android/Chrome) or Share → Add to Home Screen (iOS).
 
-When you change files, bump `VERSION` in `sw.js` so installed copies pick up the update.
+When you change files, bump `VERSION` in `sw.js` (and `APP_VERSION` in `js/app.js`). Installed copies download the new version in the background and show an **Update available · Refresh** banner; tapping Refresh switches to it.
 
 ## Files
 
@@ -40,9 +47,9 @@ styles.css              tokens (light/dark), layout
 js/dsp.js               FFT, spectral peak picking, harmonic suppression, chroma + bass chroma, tuning
 js/theory.js            key profiles, key/mode scoring, spelling, chords, Camelot
 js/app.js               mic + file pipelines, dial/piano/readout rendering, preview synth, PWA glue
-sw.js                   offline cache (shell: stale-while-revalidate; fonts cached on first use)
+sw.js                   offline cache per version; waits for the user to tap Refresh before updating
 manifest.webmanifest    install metadata
-icons/                  favicon + PNG icons (icon.svg is the source)
+icons/                  favicon + PNG app icons; icons/brand/ holds the logo files
 ```
 
 ## How detection works
