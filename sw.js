@@ -1,6 +1,6 @@
 // Tonic service worker.
 // Bump VERSION on every release: the page sees the new worker waiting and offers "Refresh".
-const VERSION = 'tonic-v3';
+const VERSION = 'tonic-v4';
 const SHELL = [
   './',
   './index.html',
@@ -14,8 +14,6 @@ const SHELL = [
   './icons/icon-512.png',
   './icons/apple-touch-icon.png',
   './icons/brand/mark-ink.svg',
-  './icons/brand/mark-paper.svg',
-  './icons/brand/wordmark-white.svg',
   './icons/brand/full-logo-dark.svg',
   './icons/brand/full-logo-light.svg',
 ];
