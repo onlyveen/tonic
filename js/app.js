@@ -1,5 +1,5 @@
 import { FFT, findPeaks, KeyEngine, estimateTuning } from './dsp.js';
-import { analyzeEngine, describe, spellScale, SCALES, FIFTHS, TITLE_WORD } from './theory.js';
+import { analyzeEngine, describe, spellScale, refineMinor, SCALES, FIFTHS, TITLE_WORD } from './theory.js';
 
 const $ = (id) => document.getElementById(id);
 const NS = 'http://www.w3.org/2000/svg';
@@ -31,6 +31,8 @@ const state = {
   pendingCount: 0,
   muteUntil: 0,
   current: null, // { desc, analysis, tuning }
+  pick: null, // id of the scale the user selected among the closest three
+  last3: null, // last render inputs, so a pick can re-render without new audio
   deferredInstall: null,
 };
 
@@ -296,7 +298,53 @@ function setConfidence(level, seconds, margin) {
   $('conf-label').textContent = CONF_TEXT[level];
 }
 
-function renderResult(analysis, desc, { confidence, sourceText, tuning }) {
+
+/** The shown scale plus the next two distinct scales (tonic + scale type), with relative match. */
+function closestScales(analysis, shown) {
+  const { ranked, chroma } = analysis;
+  const typed = ranked.map((k) => ({ ...k, scale: refineMinor(chroma, k.tonic, k.type) }));
+  const hit = typed.find((k) => k.tonic === shown.tonic && k.scale === shown.scaleId);
+  const top = hit ? hit.r : ranked[0].r;
+  const pct = (r) => Math.max(1, Math.min(100, Math.round(((r - (top - 0.45)) / 0.45) * 100)));
+  const list = [{ id: `${shown.tonic}:${shown.scaleId}`, desc: shown, pct: 100 }];
+  for (const k of typed) {
+    if (list.length === 3) break;
+    const id = `${k.tonic}:${k.scale}`;
+    if (list.some((o) => o.id === id)) continue;
+    list.push({ id, desc: describe(k.tonic, k.scale), pct: pct(k.r) });
+  }
+  return list;
+}
+
+function renderPicker(options, selectedId) {
+  const wrap = $('scales');
+  wrap.replaceChildren();
+  options.forEach((o, i) => {
+    const b = el('button');
+    b.type = 'button';
+    b.setAttribute('aria-pressed', String(o.id === selectedId));
+    b.setAttribute('aria-label', `${o.desc.title}, ${i === 0 ? 'best match' : `${o.pct} percent of the best match`}`);
+    const sn = el('span', 'sn', o.desc.title);
+    const sp = el('span', 'sp');
+    if (i === 0) sp.append(el('b', '', 'Best'), ` · ${o.pct}%`);
+    else sp.append(`${o.pct}%`);
+    b.append(sn, sp);
+    b.addEventListener('click', () => {
+      state.pick = o.id;
+      if (state.last3) renderResult(...state.last3);
+    });
+    wrap.append(b);
+  });
+}
+
+function renderResult(analysis, shownDesc, opts) {
+  state.last3 = [analysis, shownDesc, opts];
+  const { confidence, sourceText, tuning } = opts;
+  const options = closestScales(analysis, shownDesc);
+  const selected = options.find((o) => o.id === state.pick) || options[0];
+  const desc = selected.desc;
+  const isAlt = selected !== options[0];
+  renderPicker(options, selected.id);
   const app = $('app');
   app.classList.remove('pending');
   setKeyName(desc);
@@ -310,8 +358,14 @@ function renderResult(analysis, desc, { confidence, sourceText, tuning }) {
 
   $('track-title').textContent = desc.title;
   $('track-sub').textContent = desc.sibling.label === 'Relative' ? `Relative · ${desc.sibling.name}` : `${desc.sibling.label} ${desc.sibling.name}`;
-  setConfidence(confidence, analysis.seconds, analysis.margin);
-  const tuneText = tuning === null ? '' : ` · A4 ${(440 * Math.pow(2, tuning / 1200)).toFixed(1)}`;
+  if (isAlt) {
+    $('conf-fill').style.width = selected.pct + '%';
+    $('conf-tick').style.left = selected.pct + '%';
+    $('conf-label').textContent = `${selected.pct}% of best`;
+  } else {
+    setConfidence(confidence, analysis.seconds, analysis.margin);
+  }
+  const tuneText = tuning === null || Math.abs(tuning) < 3 ? '' : ` · A4 ${(440 * Math.pow(2, tuning / 1200)).toFixed(1)}`;
   $('tuning').textContent = `Camelot ${desc.camelot}${tuneText}`;
 
   const chars = CHAR_DEGREES[desc.scaleId] || [];
@@ -341,36 +395,6 @@ function renderResult(analysis, desc, { confidence, sourceText, tuning }) {
     li.append(b);
     chords.append(li);
   });
-
-  const cands = $('cands');
-  cands.replaceChildren();
-  const seen = new Set([desc.tonic + ':' + desc.quality]);
-  const top = analysis.ranked[0].r;
-  const list = [];
-  for (const k of analysis.ranked) {
-    const id = k.tonic + ':' + k.quality;
-    if (seen.has(id)) continue;
-    seen.add(id);
-    list.push(k);
-    if (list.length === 4) break;
-  }
-  for (const k of list) {
-    const d = describe(k.tonic, k.type);
-    const li = el('li');
-    const nm = el('span', 'nm', d.title);
-    const same = d.pcs.size === desc.pcs.size && [...d.pcs].every((pc) => desc.pcs.has(pc));
-    if (k.tonic === desc.tonic) nm.append(el('span', 'tag', 'Same tonic'));
-    else if (same) nm.append(el('span', 'tag', 'Same notes'));
-    const bar = el('span', 'bar');
-    const pct = Math.max(4, Math.min(100, ((k.r - (top - 0.45)) / 0.45) * 100));
-    const fill = el('span');
-    fill.style.width = pct.toFixed(0) + '%';
-    bar.append(fill);
-    const v = el('span', 'v', String(Math.round(pct)));
-    v.title = 'Match strength relative to the top result';
-    li.append(nm, bar, v);
-    cands.append(li);
-  }
 
   drawRecord(analysis, desc, tuning);
   drawPetals(analysis.chroma, desc);
@@ -480,6 +504,7 @@ async function startListening() {
   }));
 
   state.engine = new KeyEngine({ halfLife: LIVE_HALF_LIFE });
+  state.pick = null;
   state.shown = null;
   state.pending = null;
   state.pendingCount = 0;
@@ -616,6 +641,7 @@ async function analyzeFile(file) {
   if (state.mode === 'listening') stopListening();
   if (state.mode === 'analyzing') return;
   state.mode = 'analyzing';
+  state.pick = null;
   setButtons(true);
   renderPending('Analyzing…', 'Reading the whole song. This takes a few seconds.', `File · ${file.name}`);
   setStatus('analyzing', 'Decoding file…');
@@ -808,6 +834,7 @@ function registerServiceWorker() {
 /* ---------- Example state ---------- */
 
 function showExample() {
+  state.pick = null;
   // A clearly labelled sample: what a confident C major read looks like.
   const engine = new KeyEngine();
   [6.6, 0.4, 3.4, 0.5, 4.9, 3.9, 0.6, 5.6, 0.5, 4.1, 0.6, 2.6].forEach((v, i) => { engine.chroma[i] = v; });

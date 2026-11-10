@@ -45,6 +45,11 @@
 
       <!-- The deck: vinyl circle of fifths, track row, cards -->
       <section class="deck" aria-label="Key details">
+        <div class="picker">
+          <p class="picker-label" id="picker-label">Closest scales</p>
+          <div class="seg" id="scales" role="group" aria-labelledby="picker-label"></div>
+        </div>
+
         <div class="disc-wrap">
           <span class="sheen" aria-hidden="true"></span>
           <svg id="dial" viewBox="0 0 400 400" role="img" aria-label="Circle of fifths drawn as a record. Red segments match what Tonic hears; the bars around the label show how much of each note it heard."></svg>
@@ -81,12 +86,6 @@
           <h2>Chords</h2>
           <p class="card-sub">Tap a chord to hear it. Roman numerals show its place in the key.</p>
           <ol class="pills chords" id="chords"></ol>
-        </article>
-
-        <article class="card" id="card-cands">
-          <h2>Close matches</h2>
-          <p class="card-sub">Other keys that fit what Tonic heard. Relative keys share every note.</p>
-          <ol class="cands" id="cands"></ol>
         </article>
 
         <details class="card about" id="about">
