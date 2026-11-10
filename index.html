@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Tonic</title>
+  <meta name="description" content="Listens to a song and tells you its key, scale, and the chords that fit.">
+  <meta name="theme-color" content="#E9EBEE" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0F1115" media="(prefers-color-scheme: dark)">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Tonic">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@500&display=swap">
+  <link rel="stylesheet" href="styles.css">
+  <script type="module" src="js/app.js"></script>
+</head>
+<body>
+  <div class="app" id="app" data-quality="major">
+    <header class="topbar">
+      <div class="brand">
+        <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+          <circle cx="16" cy="16" r="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-dasharray="5.3 1.5"/>
+          <path d="M16 3a13 13 0 0 1 6.5 1.74" fill="none" stroke="var(--major)" stroke-width="2.5"/>
+          <circle cx="16" cy="16" r="4" fill="currentColor"/>
+        </svg>
+        <span class="brand-name">Tonic</span>
+        <span class="brand-tag">Key &amp; scale finder</span>
+      </div>
+      <button type="button" id="install" class="btn ghost small" hidden>Install app</button>
+    </header>
+
+    <main class="layout">
+      <section class="stage" aria-label="Listening controls">
+        <div class="dial-wrap">
+          <svg id="dial" viewBox="0 0 400 400" role="img" aria-label="Circle of fifths. Shaded keys match what Tonic hears; petals show how much of each note it heard."></svg>
+        </div>
+
+        <div class="status" data-kind="idle" id="status">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span class="status-text" id="status-text" role="status" aria-live="polite">Ready. Tap Listen and play a song nearby.</span>
+          <span class="meter" aria-hidden="true"><span class="meter-fill" id="meter-fill"></span></span>
+          <span class="clock mono" id="clock" title="Seconds of music analyzed">0:00</span>
+        </div>
+        <div class="progress" id="progress" hidden><span id="progress-fill"></span></div>
+
+        <div class="controls">
+          <button type="button" id="listen" class="btn primary">
+            <svg viewBox="0 0 24 24" aria-hidden="true" class="ico ico-mic"><path d="M12 15a3.5 3.5 0 0 0 3.5-3.5v-5a3.5 3.5 0 1 0-7 0v5A3.5 3.5 0 0 0 12 15Zm6-3.5a6 6 0 0 1-12 0M12 17.5V21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            <svg viewBox="0 0 24 24" aria-hidden="true" class="ico ico-stop"><rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor"/></svg>
+            <span id="listen-label">Listen</span>
+          </button>
+          <button type="button" id="pick" class="btn secondary">
+            <svg viewBox="0 0 24 24" aria-hidden="true" class="ico"><path d="M9 18V6l10-2v12M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm10-2a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+            Analyze a file
+          </button>
+          <button type="button" id="reset" class="btn ghost">Reset</button>
+          <input type="file" id="file" accept="audio/*,video/mp4,.mp3,.m4a,.aac,.wav,.flac,.ogg,.opus" hidden>
+        </div>
+        <p class="hint" id="hint">Hold your phone near the speaker. Audio is analyzed on this device and never uploaded.</p>
+      </section>
+
+      <section class="result" id="result" aria-live="polite" aria-label="Detected key">
+        <div class="result-head">
+          <p class="eyebrow"><span class="source-chip" id="source">Example</span><span id="source-detail">Tap Listen or pick a song file to start</span></p>
+          <h1 class="key-name" id="key-name"><span class="tonic">C</span> <span class="word">major</span></h1>
+          <p class="scale-line" id="scale-line">Major scale · Ionian mode</p>
+          <ul class="facts" id="facts"></ul>
+        </div>
+
+        <div class="block" id="block-notes">
+          <div class="block-head">
+            <h2 class="label">Scale notes</h2>
+            <button type="button" class="btn ghost small" id="play-scale">
+              <svg viewBox="0 0 24 24" aria-hidden="true" class="ico"><path d="M8 5.5v13l11-6.5-11-6.5Z" fill="currentColor"/></svg>
+              Play scale
+            </button>
+          </div>
+          <ol class="notes" id="notes"></ol>
+          <svg class="piano" id="piano" viewBox="0 0 393 112" role="img" aria-label="Piano keyboard with the scale's notes highlighted"></svg>
+        </div>
+
+        <div class="block" id="block-chords">
+          <div class="block-head">
+            <h2 class="label">Chords in this key</h2>
+            <span class="aside">Tap a chord to hear it</span>
+          </div>
+          <ol class="chords" id="chords"></ol>
+        </div>
+
+        <div class="block" id="block-cands">
+          <div class="block-head">
+            <h2 class="label">Other close matches</h2>
+          </div>
+          <ol class="cands" id="cands"></ol>
+        </div>
+      </section>
+    </main>
+
+    <footer class="foot">
+      <details>
+        <summary>How Tonic works</summary>
+        <p>Tonic measures how much of each of the 12 notes it hears, with extra weight on the bass line, and compares that profile with templates for every major and minor key (Krumhansl–Kessler and Temperley profiles). After about 20 seconds it also tests the Dorian, Mixolydian, Lydian and Phrygian modes, and checks minor keys for a raised 7th (harmonic minor). It corrects for songs that aren't tuned to A&nbsp;=&nbsp;440&nbsp;Hz.</p>
+        <p>Relative keys share the same notes (C major and A minor, for example), so they are the most common mix-up. When the result says close call, check the other matches and trust your ear.</p>
+      </details>
+      <p class="ios-hint" id="ios-hint" hidden>To install on iPhone: tap Share, then Add to Home Screen.</p>
+    </footer>
+  </div>
+</body>
+</html>

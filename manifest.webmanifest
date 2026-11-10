@@ -1,0 +1,17 @@
+{
+  "name": "Tonic Key Finder",
+  "short_name": "Tonic",
+  "description": "Listens to a song and tells you its key, scale, and the chords that fit.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#E9EBEE",
+  "theme_color": "#E9EBEE",
+  "categories": ["music", "utilities"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
