@@ -1,15 +1,19 @@
-import { FFT, findPeaks, KeyEngine, estimateTuning } from './dsp.js';
-import { analyzeEngine, describe, spellScale, refineMinor, SCALES, FIFTHS, TITLE_WORD } from './theory.js';
+import { FFT, findPeaks, KeyEngine, estimateTuning, fundamental, noteFrame } from './dsp.js';
+import { analyzeEngine, describe, spellScale, refineMinor, KeyTracker, SCALES, FIFTHS, TITLE_WORD } from './theory.js';
 
 const $ = (id) => document.getElementById(id);
 const NS = 'http://www.w3.org/2000/svg';
 
-const LIVE_HALF_LIFE = 30; // seconds: older music fades so a new song takes over
+const LIVE_HALF_LIFE = 60; // seconds: older music fades so a new song takes over
 const QUIET_DB = -62; // input RMS below this counts as silence
 const FIRST_READ = 6; // seconds of music before the first answer
 const EARLY_READ = 15; // answers before this are labelled "early read"
 const TICK_MS = 150;
-const SWITCH_AFTER = 3; // consecutive evaluations a new key must win before it replaces the shown one
+// Singing (one voice) is read from its melody notes instead of the raw spectrum, because a
+// voice's overtones (strongest at the 3rd harmonic, the 5th above) pull the key toward the dominant.
+const MONO_RATIO = 0.8; // share of the spectrum one note's harmonics must explain
+const VOICE_ON = 0.7, VOICE_OFF = 0.45; // running share of single-voice frames to switch modes
+const VOICE_OPTS = { useBass: false, modeMargin: 0.05 };
 
 const CHAR_DEGREES = { dorian: [5], phrygian: [1], lydian: [3], mixolydian: [6], harmonicMinor: [6], melodicMinor: [5, 6] };
 const CONF_TEXT = { strong: 'Strong match', likely: 'Likely', close: 'Close call', early: 'Early read' };
@@ -26,9 +30,10 @@ const state = {
   wake: null,
   last: 0,
   tick: 0,
-  shown: null,
-  pending: null,
-  pendingCount: 0,
+  melody: null, // KeyEngine fed with one sung note per frame
+  tracker: new KeyTracker(),
+  monoEma: 0,
+  voice: false,
   muteUntil: 0,
   current: null, // { desc, analysis, tuning }
   pick: null, // id of the scale the user selected among the closest three
@@ -498,10 +503,11 @@ async function startListening() {
   }));
 
   state.engine = new KeyEngine({ halfLife: LIVE_HALF_LIFE });
+  state.melody = new KeyEngine({ halfLife: LIVE_HALF_LIFE });
+  state.tracker.reset();
+  state.monoEma = 0;
+  state.voice = false;
   state.pick = null;
-  state.shown = null;
-  state.pending = null;
-  state.pendingCount = 0;
   state.tick = 0;
   state.last = performance.now();
   state.mode = 'listening';
@@ -534,7 +540,8 @@ function stopListening(message) {
   if (wasListening && !state.current) {
     renderPending('Not enough music', 'Tap Listen and let a song play for at least 10 seconds.', 'Live · microphone');
   } else if (wasListening && state.current) {
-    $('source').textContent = `Mic · based on ${Math.round(state.engine.seconds)} s of music`;
+    const used = state.voice ? state.melody : state.engine;
+    $('source').textContent = `${state.voice ? 'Singing' : 'Mic'} · based on ${Math.round(used.seconds)} s`;
   }
 }
 
@@ -566,8 +573,15 @@ function tick() {
     const v = n.freq[i];
     n.mag[i] = v > -200 ? Math.pow(10, v / 20) : 0;
   }
-  state.engine.add(findPeaks(n.mag, n.binHz), dt);
-  setStatus('listening', 'Now listening');
+  const found = findPeaks(n.mag, n.binHz);
+  state.engine.add(found, dt);
+  const fz = fundamental(found);
+  const mono = !!fz && fz.ratio >= MONO_RATIO;
+  if (mono) state.melody.add(noteFrame(fz.f0), dt);
+  state.monoEma += ((mono ? 1 : 0) - state.monoEma) * (1 - Math.exp(-dt / 4));
+  if (!state.voice && state.monoEma > VOICE_ON) state.voice = true;
+  else if (state.voice && state.monoEma < VOICE_OFF) state.voice = false;
+  setStatus('listening', state.voice ? 'Hearing a voice' : 'Now listening');
   setClock(state.engine.seconds);
 
   state.tick++;
@@ -575,37 +589,24 @@ function tick() {
   else if (!state.current) drawPetals(state.engine.normalized(), null);
 }
 
-function sameCollection(a, b) {
-  return a.pcs.size === b.pcs.size && [...a.pcs].every((pc) => b.pcs.has(pc));
-}
-
 function evaluateLive() {
-  const eng = state.engine;
+  const eng = state.voice ? state.melody : state.engine;
   if (eng.seconds < FIRST_READ) {
-    drawPetals(eng.normalized(), null);
-    const left = Math.ceil(FIRST_READ - eng.seconds);
-    $('scale-line').textContent = `First read in about ${left} second${left === 1 ? '' : 's'}…`;
+    if (!state.current) {
+      drawPetals(eng.normalized(), null);
+      const left = Math.ceil(FIRST_READ - eng.seconds);
+      $('scale-line').textContent = `First read in about ${left} second${left === 1 ? '' : 's'}…`;
+    }
     return;
   }
-  const a = analyzeEngine(eng);
+  const a = analyzeEngine(eng, state.voice ? VOICE_OPTS : {});
   const id = `${a.best.tonic}:${a.type}`;
-  if (!state.shown) {
-    state.shown = id;
-  } else if (id !== state.shown) {
-    if (state.pending === id) state.pendingCount++;
-    else { state.pending = id; state.pendingCount = 1; }
-    // Re-reading the same notes with a different tonic (relative key, mode) needs more
-    // evidence than a real change of song.
-    const [st, sty] = state.shown.split(':');
-    const sameNotes = sameCollection(describe(Number(st), sty), describe(a.best.tonic, a.type));
-    if (state.pendingCount >= (sameNotes ? SWITCH_AFTER * 2 : SWITCH_AFTER)) { state.shown = id; state.pending = null; }
-  } else {
-    state.pending = null;
-  }
-  const [tonic, type] = state.shown.split(':');
+  const shown = state.tracker.update(a, eng.seconds, { early: EARLY_READ });
+  const [tonic, type] = shown.split(':');
   const desc = describe(Number(tonic), type);
-  const confidence = eng.seconds < EARLY_READ ? 'early' : state.shown === id ? a.confidence : 'close';
-  renderResult(a, desc, { confidence, sourceText: `Live · mic · ${Math.round(eng.seconds)} s of music`, tuning: eng.tuningCents });
+  const confidence = eng.seconds < EARLY_READ ? 'early' : shown === id ? a.confidence : 'close';
+  const what = state.voice ? `Live · singing · ${Math.round(eng.seconds)} s` : `Live · mic · ${Math.round(eng.seconds)} s of music`;
+  renderResult(a, desc, { confidence, sourceText: what, tuning: eng.tuningCents });
 }
 
 /* ---------- File analysis ---------- */
@@ -675,13 +676,21 @@ async function analyzeFile(file) {
     const mag = new Float32Array(N / 2);
     const total = Math.max(1, Math.floor(Math.max(0, len - N) / hop) + 1);
     const frames = [];
+    const notes = []; // one sung note per frame, when a single voice dominates
+    let monoCount = 0, voicedCount = 0;
     for (let f = 0; f < total; f++) {
       const off = f * hop;
       let s = 0;
       for (let i = 0; i < N && off + i < len; i += 4) s += mono[off + i] * mono[off + i];
       if (Math.sqrt(s / (N / 4)) < 0.003) { frames.push(null); continue; }
       fft.magnitudes(mono, off, mag, maxBin);
-      frames.push(findPeaks(mag, binHz));
+      const found = findPeaks(mag, binHz);
+      frames.push(found);
+      if (found) {
+        voicedCount++;
+        const fz = fundamental(found);
+        if (fz && fz.ratio >= MONO_RATIO) { monoCount++; notes.push(fz.f0); }
+      }
       if (f % 24 === 0) {
         wave.progress = f / total;
         drawWave();
@@ -690,9 +699,16 @@ async function analyzeFile(file) {
         await nextFrame();
       }
     }
+    const isVoice = voicedCount > 10 && monoCount / voicedCount >= 0.6;
     const engine = new KeyEngine();
-    engine.fixedTuning = estimateTuning(frames);
-    for (const fr of frames) engine.add(fr, hop / sr);
+    if (isVoice) {
+      const nf = notes.map(noteFrame);
+      engine.fixedTuning = estimateTuning(nf);
+      for (const fr of nf) engine.add(fr, hop / sr);
+    } else {
+      engine.fixedTuning = estimateTuning(frames);
+      for (const fr of frames) engine.add(fr, hop / sr);
+    }
     state.engine = engine;
     wave.progress = 1;
     drawWave();
@@ -702,10 +718,10 @@ async function analyzeFile(file) {
       renderPending('No clear notes', 'That file seems silent or has no pitched music. Try another song.', `File · ${file.name}`);
       setStatus('error', 'Could not find enough music in that file.');
     } else {
-      const a = analyzeEngine(engine);
+      const a = analyzeEngine(engine, isVoice ? VOICE_OPTS : {});
       renderResult(a, describe(a.best.tonic, a.type), {
         confidence: a.confidence,
-        sourceText: `File · ${file.name}`,
+        sourceText: `File · ${isVoice ? 'singing · ' : ''}${file.name}`,
         tuning: engine.tuningCents,
       });
       setStatus('idle', 'Done');
@@ -817,7 +833,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
 });
 window.addEventListener('appinstalled', () => { $('install').hidden = true; });
 
-const APP_VERSION = '1.4.1';
+const APP_VERSION = '1.5.0';
 
 /* Updates: a new service worker installs in the background and waits; we offer Refresh. */
 function showUpdateToast(worker) {
@@ -897,8 +913,10 @@ function init() {
   $('reset').addEventListener('click', () => {
     if (state.mode === 'listening') {
       state.engine.reset();
-      state.shown = null;
-      state.pending = null;
+      state.melody.reset();
+      state.tracker.reset();
+      state.monoEma = 0;
+      state.voice = false;
       setClock(0);
       renderPending('Listening…', 'Started over. A fresh read appears after a few seconds of music.', 'Live · microphone');
     } else if (state.mode === 'idle') {

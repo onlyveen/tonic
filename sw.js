@@ -1,6 +1,6 @@
 // Tonic service worker.
 // Bump VERSION on every release: the page sees the new worker waiting and offers "Refresh".
-const VERSION = 'tonic-v6';
+const VERSION = 'tonic-v7';
 const SHELL = [
   './',
   './index.html',

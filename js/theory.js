@@ -135,15 +135,15 @@ export function spellScale(tonicPc, steps) {
  */
 const MODE_MARGIN = 0.02;
 
-export function analyzeEngine(engine, { minModeSeconds = 20 } = {}) {
+export function analyzeEngine(engine, { minModeSeconds = 20, useBass = true, modeMargin = MODE_MARGIN } = {}) {
   const chroma = engine.normalized();
-  const bass = engine.bassSeconds > 2 ? engine.normalized(engine.bass) : null;
+  const bass = useBass && engine.bassSeconds > 2 ? engine.normalized(engine.bass) : null;
   const ranked = scoreKeys(chroma, { bass, modes: engine.seconds >= minModeSeconds });
   // A mode has to clearly beat the best plain major/minor reading, otherwise report that.
   let best = ranked[0];
   if (best.type !== 'major' && best.type !== 'minor') {
     const plain = ranked.find((k) => k.type === 'major' || k.type === 'minor');
-    if (best.r - plain.r < MODE_MARGIN) best = plain;
+    if (best.r - plain.r < modeMargin) best = plain;
   }
   const type = refineMinor(chroma, best.tonic, best.type);
   // Margin to the strongest candidate with a different tonic.
@@ -224,4 +224,46 @@ export function describe(tonic, scaleId) {
     sibling,
     camelot: camelot(tonic, quality),
   };
+}
+
+/** Score of a given tonic + scale within an analysis (harmonic/melodic minor score as minor). */
+export function scoreOf(analysis, tonic, scaleId) {
+  const asType = scaleId === 'harmonicMinor' || scaleId === 'melodicMinor' ? 'minor' : scaleId;
+  const hit = analysis.ranked.find((k) => k.tonic === tonic && k.type === asType);
+  return hit ? hit.r : -Infinity;
+}
+
+const sameNotes = (a, b) => a.pcs.size === b.pcs.size && [...a.pcs].every((pc) => b.pcs.has(pc));
+
+/**
+ * Keeps the displayed key steady. A challenger replaces the shown key only after it has
+ * led by a clear margin for several evaluations in a row; re-reading the same notes with
+ * another tonic (relative key, mode) or the same tonic with another scale needs more.
+ */
+export class KeyTracker {
+  constructor() { this.reset(); }
+  reset() { this.shown = null; this.pending = null; this.count = 0; }
+  update(a, seconds, { early = 15 } = {}) {
+    const id = `${a.best.tonic}:${a.type}`;
+    if (!this.shown || id === this.shown) {
+      this.shown = id;
+      this.pending = null;
+      this.count = 0;
+      return this.shown;
+    }
+    const [st, sty] = this.shown.split(':');
+    const shownTonic = Number(st);
+    const lead = a.best.r - scoreOf(a, shownTonic, sty);
+    const subtle = shownTonic === a.best.tonic || sameNotes(describe(shownTonic, sty), describe(a.best.tonic, a.type));
+    const need = seconds < early ? { lead: 0.0, count: 2 } : subtle ? { lead: 0.04, count: 8 } : { lead: 0.02, count: 4 };
+    if (lead >= need.lead) {
+      if (this.pending === id) this.count++;
+      else { this.pending = id; this.count = 1; }
+    } else {
+      this.pending = null;
+      this.count = 0;
+    }
+    if (this.count >= need.count) { this.shown = id; this.pending = null; this.count = 0; }
+    return this.shown;
+  }
 }

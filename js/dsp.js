@@ -206,3 +206,43 @@ export function estimateTuning(frames) {
   }
   return tw > 0 ? (Math.atan2(ty, tx) / TWO_PI) * 100 : 0;
 }
+
+/**
+ * Fundamental of a single voice or instrument from its peaks.
+ * Returns { f0, ratio } where ratio is the share of spectral peak energy the f0's harmonic
+ * series explains: near 1 for one voice, much lower for chords and full mixes.
+ */
+export function fundamental(found) {
+  if (!found || !found.peaks.length) return null;
+  const peaks = found.peaks;
+  let total = 0;
+  for (const p of peaks) total += p.amp;
+  const strong = [...peaks].sort((a, b) => b.amp - a.amp).slice(0, 6);
+  const cands = [];
+  for (const p of strong) {
+    for (const div of [1, 2, 3, 4]) {
+      const f0 = p.f / div;
+      if (f0 < 60 || f0 > 1100) continue;
+      let s = 0, has1 = false;
+      for (const q of peaks) {
+        const k = Math.round(q.f / f0);
+        if (k < 1 || k > 12) continue;
+        if (Math.abs(q.f / (k * f0) - 1) < 0.03) { s += q.amp; if (k === 1) has1 = true; }
+      }
+      // Phone mics roll off low fundamentals, so a missing first harmonic is only lightly penalised.
+      if (!has1) s *= 0.85;
+      cands.push({ f0, s });
+    }
+  }
+  if (!cands.length) return null;
+  let maxS = 0;
+  for (const c of cands) if (c.s > maxS) maxS = c.s;
+  // Every subharmonic explains at least as much as the true f0, so take the highest
+  // candidate that explains nearly as much as the best one.
+  let best = null;
+  for (const c of cands) if (c.s >= maxS * 0.9 && (!best || c.f0 > best.f0)) best = c;
+  return { f0: best.f0, ratio: maxS / total };
+}
+
+/** A one-note "spectrum" for the melody engine. */
+export const noteFrame = (f0) => ({ peaks: [{ f: f0, amp: 1, w: 1 }], max: 1 });
