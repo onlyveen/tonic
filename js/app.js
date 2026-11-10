@@ -336,6 +336,7 @@ function renderPicker(options, selectedId) {
 
 function renderResult(analysis, shownDesc, opts) {
   $('app').classList.remove('welcome');
+  if (state.mode !== 'analyzing') $('reset').disabled = false;
   state.last3 = [analysis, shownDesc, opts];
   const { confidence, sourceText, tuning } = opts;
   const options = closestScales(analysis, shownDesc);
@@ -401,6 +402,7 @@ function renderResult(analysis, shownDesc, opts) {
 
 function renderPending(title, detail, sourceText) {
   $('app').classList.remove('welcome');
+  if (state.mode !== 'analyzing') $('reset').disabled = false;
   $('app').classList.add('pending');
   $('key-name').textContent = title;
   $('scale-line').textContent = detail;
@@ -431,9 +433,11 @@ function setClock(seconds) {
 
 function setListeningUI(on) {
   $('app').classList.toggle('listening', on);
-  $('listen').classList.toggle('on', on);
-  $('listen-label').textContent = on ? 'Live' : 'Listen';
-  $('stop').disabled = !on;
+  const btn = $('listen');
+  btn.classList.toggle('on', on);
+  btn.setAttribute('aria-pressed', String(on));
+  btn.setAttribute('aria-label', on ? 'Stop listening' : 'Start listening');
+  $('listen-label').textContent = on ? 'Stop' : 'Listen';
 }
 
 /* ---------- Live listening ---------- */
@@ -739,7 +743,7 @@ async function analyzeFile(file) {
 function setButtons(busy) {
   $('listen').disabled = busy;
   $('pick').disabled = busy;
-  $('reset').disabled = busy;
+  $('reset').disabled = busy || $('app').classList.contains('welcome');
 }
 
 /* ---------- Preview synth ---------- */
@@ -886,6 +890,7 @@ function showIntro() {
   const app = $('app');
   app.classList.remove('pending');
   app.classList.add('welcome');
+  $('reset').disabled = true;
   setStatus('idle', 'Ready');
   setClock(0);
   window.scrollTo(0, 0);
@@ -902,8 +907,10 @@ function init() {
   sizeWave();
   showIntro();
 
-  $('listen').addEventListener('click', () => { if (state.mode === 'idle') startListening(); });
-  $('stop').addEventListener('click', () => { if (state.mode === 'listening') stopListening(); });
+  $('listen').addEventListener('click', () => {
+    if (state.mode === 'listening') stopListening();
+    else if (state.mode === 'idle') startListening();
+  });
   $('pick').addEventListener('click', () => $('file').click());
   $('file').addEventListener('change', (e) => {
     const f = e.target.files && e.target.files[0];
