@@ -817,7 +817,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
 });
 window.addEventListener('appinstalled', () => { $('install').hidden = true; });
 
-const APP_VERSION = '1.4.0';
+const APP_VERSION = '1.4.1';
 
 /* Updates: a new service worker installs in the background and waits; we offer Refresh. */
 function showUpdateToast(worker) {
