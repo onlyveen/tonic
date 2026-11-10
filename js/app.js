@@ -58,7 +58,7 @@ function ensureCtx() {
 
 /* ---------- Waveform strip ---------- */
 
-const wave = { el: null, g: null, w: 0, h: 0, dpr: 1, history: [], ref: 0.02, overview: null, progress: 0, mode: 'live' };
+const wave = { el: null, g: null, w: 0, h: 0, dpr: 1, history: [], ref: 0.02 };
 
 function sizeWave() {
   const r = wave.el.getBoundingClientRect();
@@ -70,54 +70,73 @@ function sizeWave() {
   drawWave();
 }
 
+// Scrolling level history; newest bar at the right, flowing into the live-note circle.
 function drawWave() {
   const { g, w, h, dpr } = wave;
   if (!g) return;
   g.clearRect(0, 0, w, h);
   const step = 4 * dpr;
   const bw = 1.5 * dpr;
-  const mid = h * 0.58;
-  const maxH = h * 0.8;
-  let px;
-  let bars = [];
-  if (wave.mode === 'live') {
-    px = Math.round(w * 0.64);
-    const hist = wave.history;
-    for (let k = 0, x = px; x >= 0; k++, x -= step) bars.push([x, hist[hist.length - 1 - k] || 0]);
-  } else {
-    const ov = wave.overview || [];
-    px = Math.round(w * Math.max(0, Math.min(1, wave.progress)));
-    const n = Math.floor(w / step);
-    for (let i = 0; i <= n; i++) {
-      const x = i * step + step / 2;
-      if (x > px) break;
-      const v = ov.length ? ov[Math.min(ov.length - 1, Math.floor((i / n) * ov.length))] : 0;
-      bars.push([x, v]);
-    }
-  }
-  // Shaded windows behind the bars: grey (earlier) and red (what is being analyzed now).
-  const redW = w * 0.2, greyW = w * 0.22;
-  g.fillStyle = 'rgba(0,0,0,0.045)';
-  g.fillRect(Math.max(0, px - redW - greyW), 0, Math.max(0, Math.min(greyW, px - redW)), h * 0.52);
-  const grad = g.createLinearGradient(0, 0, 0, h * 0.56);
-  grad.addColorStop(0, 'rgba(255,68,41,0.95)');
-  grad.addColorStop(1, 'rgba(255,68,41,0)');
-  g.fillStyle = grad;
-  g.fillRect(Math.max(0, px - redW), 0, Math.min(redW, px), h * 0.56);
-
+  const mid = h * 0.5;
+  const maxH = h * 0.86;
+  const px = w - 3 * dpr;
+  const hist = wave.history;
   g.fillStyle = '#111';
-  for (const [x, v] of bars) {
+  for (let k = 0, x = px - step; x >= 0; k++, x -= step) {
+    const v = hist[hist.length - 1 - k] || 0;
     const bh = Math.max(1.5 * dpr, v * maxH);
     g.fillRect(x - bw / 2, mid - bh / 2, bw, bh);
   }
-  g.fillStyle = '#a3a3a3';
-  for (let x = px + step; x < w; x += step) g.fillRect(x - 0.6 * dpr, mid - 0.6 * dpr, 1.2 * dpr, 1.2 * dpr);
-
   g.fillStyle = SIGNAL;
-  g.fillRect(px - 0.75 * dpr, 4 * dpr, 1.5 * dpr, h - 4 * dpr);
+  g.fillRect(px - 0.75 * dpr, 4 * dpr, 1.5 * dpr, h - 8 * dpr);
   g.beginPath();
   g.arc(px, 4 * dpr, 3 * dpr, 0, Math.PI * 2);
   g.fill();
+}
+
+/* ---------- Live note ---------- */
+
+const SHORT = { major: 'maj', minor: 'min', dorian: 'dor', phrygian: 'phr', lydian: 'lyd', mixolydian: 'mix', harmonicMinor: 'h.min', melodicMinor: 'm.min' };
+const SHARPS = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
+const FLATS = ['C', 'D♭', 'D', 'E♭', 'E', 'F', 'G♭', 'G', 'A♭', 'A', 'B♭', 'B'];
+const nowNote = { pc: -1, cand: -1, count: 0 };
+
+function noteName(pc, desc) {
+  if (desc) {
+    const hit = desc.notes.find((n) => n.pc === pc);
+    if (hit) return hit.name;
+    if (desc.notes.some((n) => n.name.includes('♭'))) return FLATS[pc];
+  }
+  return SHARPS[pc];
+}
+
+function resetNowNote() {
+  nowNote.pc = -1; nowNote.cand = -1; nowNote.count = 0;
+  const box = $('now-note');
+  box.className = 'now-note quiet';
+  box.style.setProperty('--lvl', '0.86');
+  $('nn-name').textContent = '–';
+  $('nn-key').textContent = 'Live';
+}
+
+/** pc: pitch class heard right now (or -1 for silence); db: input level. */
+function updateNowNote(pc, db) {
+  const box = $('now-note');
+  const lvl = 0.86 + Math.max(0, Math.min(1, (db + 60) / 45)) * 0.16;
+  box.style.setProperty('--lvl', lvl.toFixed(3));
+  const desc = state.current ? state.current.desc : null;
+  $('nn-key').textContent = desc ? `${desc.tonicName} ${SHORT[desc.scaleId]}` : 'Live';
+  if (pc < 0) {
+    box.classList.add('quiet');
+    return;
+  }
+  // A note must hold for two ticks (~0.3 s) so slides between notes don't flicker.
+  if (pc === nowNote.cand) nowNote.count++;
+  else { nowNote.cand = pc; nowNote.count = 1; }
+  if (nowNote.count >= 2 || nowNote.pc < 0) nowNote.pc = pc;
+  box.classList.remove('quiet');
+  box.classList.toggle('out', !!desc && !desc.pcs.has(nowNote.pc));
+  $('nn-name').textContent = noteName(nowNote.pc, desc);
 }
 
 function pushLevels(time) {
@@ -130,7 +149,7 @@ function pushLevels(time) {
       if (v > pk) pk = v;
     }
     wave.ref = Math.max(0.02, wave.ref * 0.995, pk);
-    wave.history.push(Math.min(1, Math.sqrt(pk / wave.ref)));
+    wave.history.push(Math.min(1, Math.pow(pk / wave.ref, 0.85)));
   }
   if (wave.history.length > 600) wave.history.splice(0, wave.history.length - 600);
 }
@@ -519,9 +538,9 @@ async function startListening() {
   state.tick = 0;
   state.last = performance.now();
   state.mode = 'listening';
-  wave.mode = 'live';
   wave.history = [];
   wave.ref = 0.02;
+  resetNowNote();
   setListeningUI(true);
   setClock(0);
   renderPending('Listening…', `Play a song near the mic. A first read appears after about ${FIRST_READ} seconds of music.`, 'Live · microphone');
@@ -569,10 +588,12 @@ function tick() {
 
   if (now < state.muteUntil) {
     setStatus('quiet', 'Paused for preview');
+    updateNowNote(-1, db);
     return;
   }
   if (db < QUIET_DB) {
     setStatus('quiet', 'Waiting for music…');
+    updateNowNote(-1, db);
     return;
   }
 
@@ -589,6 +610,18 @@ function tick() {
   state.monoEma += ((mono ? 1 : 0) - state.monoEma) * (1 - Math.exp(-dt / 4));
   if (!state.voice && state.monoEma > VOICE_ON) state.voice = true;
   else if (state.voice && state.monoEma < VOICE_OFF) state.voice = false;
+  // Live note: the sung pitch for a single voice, otherwise the strongest note of the last second.
+  let livePc = -1;
+  if (mono) {
+    const m = 69 + 12 * Math.log2(fz.f0 / 440) - state.melody.tuningCents / 100;
+    livePc = ((Math.round(m) % 12) + 12) % 12;
+  } else if (found) {
+    const rc = state.engine.recent;
+    let best = 0;
+    for (let i = 1; i < 12; i++) if (rc[i] > rc[best]) best = i;
+    if (rc[best] > 0) livePc = best;
+  }
+  updateNowNote(livePc, db);
   setStatus('listening', state.voice ? 'Hearing a voice' : 'Now listening');
   setClock(state.engine.seconds);
 
@@ -648,10 +681,6 @@ async function analyzeFile(file) {
   setButtons(true);
   renderPending('Analyzing…', 'Reading the whole song. This takes a few seconds.', `File · ${file.name}`);
   setStatus('analyzing', 'Decoding file…');
-  wave.mode = 'file';
-  wave.overview = null;
-  wave.progress = 0;
-  drawWave();
 
   try {
     const raw = await file.arrayBuffer();
@@ -663,19 +692,6 @@ async function analyzeFile(file) {
       const ch = audio.getChannelData(c);
       for (let i = 0; i < len; i++) mono[i] += ch[i] / audio.numberOfChannels;
     }
-    // Overview waveform for the strip.
-    const buckets = 220;
-    const per = Math.max(1, Math.floor(len / buckets));
-    const ov = new Array(buckets).fill(0);
-    let gmax = 1e-6;
-    for (let b = 0; b < buckets; b++) {
-      let pk = 0;
-      for (let i = b * per; i < Math.min(len, (b + 1) * per); i += 8) pk = Math.max(pk, Math.abs(mono[i]));
-      ov[b] = pk;
-      gmax = Math.max(gmax, pk);
-    }
-    wave.overview = ov.map((v) => Math.sqrt(v / gmax));
-
     const N = 2 ** Math.round(Math.log2(sr * 0.75));
     const hop = N / 2;
     const fft = new FFT(N);
@@ -700,8 +716,6 @@ async function analyzeFile(file) {
         if (fz && fz.ratio >= MONO_RATIO) { monoCount++; notes.push(fz.f0); }
       }
       if (f % 24 === 0) {
-        wave.progress = f / total;
-        drawWave();
         setStatus('analyzing', `Analyzing · ${Math.round((f / total) * 100)}%`);
         setClock(off / sr);
         await nextFrame();
@@ -718,8 +732,6 @@ async function analyzeFile(file) {
       for (const fr of frames) engine.add(fr, hop / sr);
     }
     state.engine = engine;
-    wave.progress = 1;
-    drawWave();
     setClock(len / sr);
 
     if (engine.seconds < 3) {
@@ -841,7 +853,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
 });
 window.addEventListener('appinstalled', () => { $('install').hidden = true; });
 
-const APP_VERSION = '1.5.1';
+const APP_VERSION = '1.6.0';
 
 /* Updates: a new service worker installs in the background and waits; we offer Refresh. */
 function showUpdateToast(worker) {

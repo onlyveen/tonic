@@ -113,7 +113,22 @@ h1, h2, p { margin: 0; }
 .rec { display: none; width: 100%; }
 .app.listening .rec { display: block; animation: rec-in 0.3s ease-out; }
 @keyframes rec-in { from { opacity: 0; transform: translateY(-6px); } }
-.wave { width: 100%; height: 92px; margin-top: 14px; }
+.live-row { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
+.wave { flex: 1; min-width: 0; height: 92px; }
+/* Live note: what Tonic hears right now; red when it fits the key, black when it doesn't */
+.now-note { position: relative; flex: none; width: 86px; height: 86px; display: grid; place-items: center; --lvl: 0.86; }
+.nn-ring { position: absolute; inset: 0; border-radius: 50%; border: 1.5px solid var(--signal); opacity: 0.55; transform: scale(var(--lvl)); transition: transform 0.15s linear, opacity 0.2s; }
+.nn-disc {
+  position: relative; width: 70px; height: 70px; border-radius: 50%;
+  display: grid; place-content: center; justify-items: center; gap: 1px;
+  background: var(--red); color: #fff; transition: background-color 0.2s, color 0.2s;
+}
+.nn-name { font-family: var(--font-display); font-size: 31px; line-height: 1; }
+.nn-key { font: 500 8.5px/1 var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.9; }
+.now-note.out .nn-disc { background: var(--ink); }
+.now-note.out .nn-ring { border-color: var(--ink); }
+.now-note.quiet .nn-disc { background: #dcdcdc; color: #6b6b6b; }
+.now-note.quiet .nn-ring { opacity: 0.2; border-color: #9a9a9a; }
 .wave canvas { width: 100%; height: 100%; display: block; }
 .notice { margin-top: 12px; font-size: 14px; line-height: 1.4; color: var(--red); max-width: 34ch; text-wrap: balance; }
 

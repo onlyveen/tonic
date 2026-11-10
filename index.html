@@ -55,7 +55,16 @@
         <p class="source" id="source"></p>
         <div class="rec" id="rec">
           <p class="timecode" id="clock" title="Music analyzed">00:00:00</p>
-          <div class="wave"><canvas id="wave" aria-hidden="true"></canvas></div>
+          <div class="live-row">
+            <div class="wave"><canvas id="wave" aria-hidden="true"></canvas></div>
+            <div class="now-note quiet" id="now-note" aria-hidden="true">
+              <span class="nn-ring"></span>
+              <span class="nn-disc">
+                <span class="nn-name" id="nn-name">–</span>
+                <span class="nn-key" id="nn-key">Live</span>
+              </span>
+            </div>
+          </div>
         </div>
         <p class="notice" id="notice" role="alert" hidden></p>
       </section>
