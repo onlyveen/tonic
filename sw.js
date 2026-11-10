@@ -1,5 +1,5 @@
 // Tonic service worker: app shell works offline; fonts are cached on first use.
-const VERSION = 'tonic-v1';
+const VERSION = 'tonic-v2';
 const SHELL = [
   './',
   './index.html',
