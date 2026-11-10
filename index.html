@@ -21,7 +21,7 @@
 </head>
 <body>
   <div class="shell">
-    <div class="app" id="app">
+    <div class="app welcome" id="app">
 
       <!-- Now listening: title, timecode, waveform -->
       <section class="top" aria-label="Detected key">
@@ -35,9 +35,26 @@
           </button>
         </div>
 
-        <h1 class="key-name" id="key-name">C <span class="word">major</span></h1>
-        <p class="scale-line" id="scale-line">Major scale · Ionian mode</p>
-        <p class="source" id="source">Example · tap the red button to listen</p>
+        <div class="intro" id="intro">
+          <img src="icons/brand/full-logo-light.svg" alt="Tonic" class="intro-logo" width="2070" height="658">
+          <h1 class="intro-title">Find the key of any song</h1>
+          <p class="intro-lead">Tonic listens to music and tells you its key and scale, the notes in it, and the chords that fit.</p>
+          <div class="steps-wrap">
+            <p class="steps-label">How it works</p>
+            <ol class="steps">
+              <li><span class="n">01</span><p><b>Tap Listen</b><span>Play a song near your phone. A first read comes in about 6 seconds; give it 20 for modes like Dorian.</span></p></li>
+              <li><span class="n">02</span><p><b>Or pick a file</b><span>Tap File to analyze a song saved on your device.</span></p></li>
+              <li><span class="n">03</span><p><b>Read the result</b><span>Key, scale, notes, chords and the closest alternatives. Tap a chord to hear it.</span></p></li>
+            </ol>
+          </div>
+          <p class="intro-note">Audio stays on this device</p>
+          <button type="button" class="pill-btn dark" id="install" hidden>Install app</button>
+          <p class="intro-hint" id="ios-hint" hidden>To install on iPhone: tap Share, then Add to Home Screen.</p>
+        </div>
+
+        <h1 class="key-name" id="key-name">Listening…</h1>
+        <p class="scale-line" id="scale-line"></p>
+        <p class="source" id="source"></p>
         <div class="rec" id="rec">
           <p class="timecode" id="clock" title="Music analyzed">00:00:00</p>
           <div class="wave"><canvas id="wave" aria-hidden="true"></canvas></div>
@@ -98,8 +115,6 @@
           <img src="icons/brand/full-logo-dark.svg" alt="Tonic" class="about-logo" width="2070" height="658">
           <p class="card-sub">Tonic measures how much of each of the 12 notes it hears, with extra weight on the bass line, and compares that with templates for every major and minor key (Krumhansl–Kessler and Temperley profiles). After about 20 seconds it also tests the Dorian, Mixolydian, Lydian and Phrygian modes, and checks minor keys for a raised 7th. It corrects for songs that aren't tuned to A&nbsp;=&nbsp;440&nbsp;Hz.</p>
           <p class="card-sub">Audio is analyzed on this device and never uploaded.</p>
-          <button type="button" class="pill-btn" id="install" hidden>Install app</button>
-          <p class="card-sub" id="ios-hint" hidden>To install on iPhone: tap Share, then Add to Home Screen.</p>
           <p class="version" id="version"></p>
         </details>
       </section>

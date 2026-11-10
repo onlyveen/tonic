@@ -53,7 +53,7 @@ function ensureCtx() {
 
 /* ---------- Waveform strip ---------- */
 
-const wave = { el: null, g: null, w: 0, h: 0, dpr: 1, history: [], ref: 0.02, overview: null, progress: 0.64, mode: 'example' };
+const wave = { el: null, g: null, w: 0, h: 0, dpr: 1, history: [], ref: 0.02, overview: null, progress: 0, mode: 'live' };
 
 function sizeWave() {
   const r = wave.el.getBoundingClientRect();
@@ -63,15 +63,6 @@ function sizeWave() {
   wave.el.width = wave.w;
   wave.el.height = wave.h;
   drawWave();
-}
-
-function exampleOverview(n = 220) {
-  let s = 7;
-  const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
-  return Array.from({ length: n }, (_, i) => {
-    const env = 0.45 + 0.35 * Math.sin(i / 9) * Math.sin(i / 23);
-    return Math.max(0.06, Math.min(1, env * (0.35 + rnd() * 0.9)));
-  });
 }
 
 function drawWave() {
@@ -230,7 +221,7 @@ function drawRecord(analysis, desc, tuning) {
       label.classList.toggle('on', isBest);
     }
   }
-  dial.lTop.textContent = desc ? desc.title.toUpperCase() : 'LISTENING';
+  dial.lTop.textContent = desc ? desc.title.toUpperCase() : state.mode === 'analyzing' ? 'ANALYZING' : 'LISTENING';
   dial.lLeft.textContent = desc ? desc.camelot : '—';
   dial.lRight.textContent = desc ? shortTuning(tuning) : '—';
   dial.lBottom.textContent = desc ? desc.scaleName.replace('Natural ', '').toUpperCase() : 'TONIC';
@@ -339,6 +330,7 @@ function renderPicker(options, selectedId) {
 }
 
 function renderResult(analysis, shownDesc, opts) {
+  $('app').classList.remove('welcome');
   state.last3 = [analysis, shownDesc, opts];
   const { confidence, sourceText, tuning } = opts;
   const options = closestScales(analysis, shownDesc);
@@ -403,6 +395,7 @@ function renderResult(analysis, shownDesc, opts) {
 }
 
 function renderPending(title, detail, sourceText) {
+  $('app').classList.remove('welcome');
   $('app').classList.add('pending');
   $('key-name').textContent = title;
   $('scale-line').textContent = detail;
@@ -824,7 +817,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
 });
 window.addEventListener('appinstalled', () => { $('install').hidden = true; });
 
-const APP_VERSION = '1.3.1';
+const APP_VERSION = '1.4.0';
 
 /* Updates: a new service worker installs in the background and waits; we offer Refresh. */
 function showUpdateToast(worker) {
@@ -868,27 +861,18 @@ function registerServiceWorker() {
   } catch { /* sandboxed previews refuse service workers */ }
 }
 
-/* ---------- Example state ---------- */
+/* ---------- Welcome state ---------- */
 
-function showExample() {
+function showIntro() {
   state.pick = null;
-  // A clearly labelled sample: what a confident C major read looks like.
-  const engine = new KeyEngine();
-  [6.6, 0.4, 3.4, 0.5, 4.9, 3.9, 0.6, 5.6, 0.5, 4.1, 0.6, 2.6].forEach((v, i) => { engine.chroma[i] = v; });
-  [7, 0, 0, 0, 1, 3, 0, 4, 0, 3, 0, 0.4].forEach((v, i) => { engine.bass[i] = v; });
-  engine.bassSeconds = 40;
-  engine.seconds = 40;
-  const a = analyzeEngine(engine);
-  renderResult(a, describe(a.best.tonic, a.type), {
-    confidence: a.confidence,
-    sourceText: 'Example · tap the red button to listen',
-    tuning: null,
-  });
-  wave.mode = 'example';
-  wave.overview = exampleOverview();
-  wave.progress = 0.64;
-  drawWave();
-  setClock(40);
+  state.current = null;
+  state.last3 = null;
+  const app = $('app');
+  app.classList.remove('pending');
+  app.classList.add('welcome');
+  setStatus('idle', 'Ready');
+  setClock(0);
+  window.scrollTo(0, 0);
 }
 
 /* ---------- Wire up ---------- */
@@ -900,7 +884,7 @@ function init() {
   buildPiano();
   if ('ResizeObserver' in window) new ResizeObserver(sizeWave).observe(wave.el);
   sizeWave();
-  showExample();
+  showIntro();
 
   $('listen').addEventListener('click', () => { if (state.mode === 'idle') startListening(); });
   $('stop').addEventListener('click', () => { if (state.mode === 'listening') stopListening(); });
@@ -918,8 +902,7 @@ function init() {
       setClock(0);
       renderPending('Listening…', 'Started over. A fresh read appears after a few seconds of music.', 'Live · microphone');
     } else if (state.mode === 'idle') {
-      setStatus('idle', 'Ready');
-      showExample();
+      showIntro();
     }
   });
   $('play-scale').addEventListener('click', playScale);
