@@ -243,30 +243,31 @@ function buildPiano() {
     whitePcs.forEach((pc, i) => {
       const x = 0.5 + (o * 7 + i) * W;
       const rect = svg('rect', { x, y: 0.5, width: W, height: H, rx: 4, class: 'w' }, root);
+      const dot = svg('circle', { cx: x + W / 2, cy: H - 30, r: 3, class: 'kd' }, root);
       const label = svg('text', { x: x + W / 2, y: H - 10, class: 'pl' }, root);
-      pianoKeys.push({ pc, rect, label, white: true });
+      pianoKeys.push({ pc, rect, dot, label, white: true });
     });
   }
   for (let o = 0; o < 2; o++) {
     [[1, 1], [3, 2], [6, 4], [8, 5], [10, 6]].forEach(([pc, after]) => {
       const x = 0.5 + (o * 7 + after) * W - 9;
       const rect = svg('rect', { x, y: 0.5, width: 18, height: 68, rx: 3, class: 'b' }, root);
-      const dot = svg('circle', { cx: x + 9, cy: 56, r: 3, class: 'bd' }, root);
+      const dot = svg('circle', { cx: x + 9, cy: 56, r: 3, class: 'kd' }, root);
       pianoKeys.push({ pc, rect, dot, white: false });
     });
   }
 }
 
+// Plain black-and-white keyboard; the scale's keys turn orange, the home note gets a dot.
 function drawPiano(desc) {
   const names = new Map(desc.notes.map((n) => [n.pc, n.name]));
   for (const k of pianoKeys) {
-    const base = k.white ? 'w' : 'b';
-    const cls = k.pc === desc.tonic ? `${base} tonic` : desc.pcs.has(k.pc) ? `${base} in` : `${base} out`;
-    k.rect.setAttribute('class', cls);
-    if (k.dot) k.dot.setAttribute('class', desc.pcs.has(k.pc) && k.pc !== desc.tonic ? 'bd on' : 'bd');
+    const inScale = desc.pcs.has(k.pc);
+    k.rect.setAttribute('class', (k.white ? 'w' : 'b') + (inScale ? ' in' : ''));
+    k.dot.setAttribute('class', k.pc === desc.tonic ? 'kd on' : 'kd');
     if (k.label) {
-      k.label.textContent = names.get(k.pc) || '';
-      k.label.setAttribute('class', k.pc === desc.tonic ? 'pl tonic' : 'pl');
+      k.label.textContent = inScale ? names.get(k.pc) : '';
+      k.label.setAttribute('class', inScale ? 'pl in' : 'pl');
     }
   }
 }
@@ -837,7 +838,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
 });
 window.addEventListener('appinstalled', () => { $('install').hidden = true; });
 
-const APP_VERSION = '1.5.0';
+const APP_VERSION = '1.5.1';
 
 /* Updates: a new service worker installs in the background and waits; we offer Refresh. */
 function showUpdateToast(worker) {

@@ -211,14 +211,14 @@ h1, h2, p { margin: 0; }
 .chord.playing .rn { color: #fff; }
 
 .piano { width: 100%; height: auto; display: block; margin-top: 4px; }
-.piano .w { fill: #f2f2f2; stroke: #1b1b1b; stroke-width: 1; }
-.piano .w.out { fill: #a9a9a9; }
+.piano .w { fill: #f7f7f7; stroke: #1b1b1b; stroke-width: 1; }
 .piano .b { fill: #050505; }
-.piano .w.tonic, .piano .b.tonic { fill: var(--signal); }
-.piano .bd { fill: none; }
-.piano .bd.on { fill: #f2f2f2; }
+.piano .w.in { fill: var(--signal); }
+.piano .b.in { fill: var(--red); stroke: #050505; stroke-width: 2; }
+.piano .kd { fill: none; }
+.piano .kd.on { fill: #fff; }
 .piano .pl { font-family: var(--font-mono); font-size: 10.5px; fill: #3b3b3b; text-anchor: middle; }
-.piano .pl.tonic { fill: #fff; }
+.piano .pl.in { fill: #fff; font-weight: 500; }
 
 .about summary { list-style: none; display: flex; align-items: center; justify-content: space-between; cursor: pointer; min-height: 32px; }
 .about summary::-webkit-details-marker { display: none; }
